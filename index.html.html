@@ -1,0 +1,783 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>文文老師的線上鋼琴</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700;900&display=swap');
+        
+        * {
+            box-sizing: border-box;
+            touch-action: manipulation;
+        }
+
+        body {
+            font-family: 'Noto Sans TC', -apple-system, BlinkMacSystemFont, sans-serif;
+            user-select: none;
+            -webkit-user-select: none;
+            background-color: #f1f5f9;
+            color: #0f172a;
+        }
+
+        /* Keyboard Shell Container */
+        .piano-shell {
+            background: linear-gradient(180deg, #1e293b 0%, #0f172a 100%);
+            border-radius: 1rem;
+            box-shadow: 0 20px 25px -5px rgba(0,0,0,0.25), 0 8px 10px -6px rgba(0,0,0,0.2);
+        }
+
+        /* 88 Keys Container */
+        .piano-viewport {
+            overflow-x: auto;
+            scroll-behavior: smooth;
+            -webkit-overflow-scrolling: touch;
+        }
+
+        /* Scrollbar Styling */
+        .piano-viewport::-webkit-scrollbar {
+            height: 12px;
+        }
+        .piano-viewport::-webkit-scrollbar-track {
+            background: #0f172a;
+            border-radius: 6px;
+        }
+        .piano-viewport::-webkit-scrollbar-thumb {
+            background: #3b82f6;
+            border-radius: 6px;
+            border: 2px solid #0f172a;
+        }
+        .piano-viewport::-webkit-scrollbar-thumb:hover {
+            background: #60a5fa;
+        }
+
+        /* Keys track */
+        .piano-track {
+            position: relative;
+            display: flex;
+            height: 260px;
+            width: max-content;
+            padding: 8px 12px 16px 12px;
+            background: #1e293b;
+        }
+
+        /* White Key Style */
+        .white-key {
+            width: 46px;
+            height: 100%;
+            flex-shrink: 0;
+            background: linear-gradient(180deg, #ffffff 0%, #f8fafc 85%, #e2e8f0 100%);
+            border: 1px solid #94a3b8;
+            border-top: none;
+            border-radius: 0 0 6px 6px;
+            box-shadow: inset 0 -5px 6px rgba(0,0,0,0.1), 0 4px 6px -1px rgba(0,0,0,0.15);
+            display: flex;
+            flex-direction: column;
+            justify-content: flex-end;
+            align-items: center;
+            padding-bottom: 12px;
+            cursor: pointer;
+            z-index: 1;
+            transition: background 0.05s, transform 0.05s, box-shadow 0.05s;
+        }
+
+        .white-key.active, .white-key:active {
+            background: linear-gradient(180deg, #e2e8f0 0%, #cbd5e1 100%);
+            transform: translateY(3px);
+            box-shadow: inset 0 2px 4px rgba(0,0,0,0.25);
+        }
+
+        /* Black Key Style */
+        .black-key {
+            width: 28px;
+            height: 155px;
+            position: absolute;
+            background: linear-gradient(180deg, #334155 0%, #0f172a 75%, #000000 100%);
+            border-radius: 0 0 5px 5px;
+            box-shadow: 0 5px 8px rgba(0, 0, 0, 0.5), inset 0 1px 1px rgba(255,255,255,0.3);
+            display: flex;
+            flex-direction: column;
+            justify-content: flex-end;
+            align-items: center;
+            padding-bottom: 8px;
+            cursor: pointer;
+            z-index: 10;
+            color: #ffffff;
+            transition: background 0.05s, transform 0.05s, box-shadow 0.05s;
+        }
+
+        .black-key.active, .black-key:active {
+            background: linear-gradient(180deg, #475569 0%, #1e293b 100%);
+            transform: translateY(3px);
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.6);
+        }
+
+        @media (min-width: 768px) {
+            .white-key { width: 54px; }
+            .black-key { width: 32px; height: 165px; }
+            .piano-track { height: 290px; }
+        }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col justify-between py-6 px-3 md:px-10 max-w-7xl mx-auto">
+
+    <!-- HEADER & CONTROLS -->
+    <div>
+        <header class="mb-6 text-center md:text-left flex flex-col md:flex-row justify-between items-center gap-4">
+            <div>
+                <h1 class="text-3xl md:text-5xl font-black text-slate-800 tracking-tight flex items-center gap-3">
+                    🎹 文文老師的線上鋼琴
+                </h1>
+                <p class="text-slate-500 font-bold mt-1 text-sm md:text-base">全音域 88 鍵靜態網頁版 — 適合教學與練習</p>
+            </div>
+
+            <!-- Octave Quick Navigation Buttons -->
+            <div class="flex items-center gap-2 bg-white p-2 rounded-xl border border-slate-200 shadow-sm flex-wrap justify-center">
+                <span class="text-xs font-bold text-slate-500 px-1">八度快速跳轉:</span>
+                <button onclick="scrollToOctave(1)" class="px-3 py-1.5 bg-slate-100 hover:bg-blue-100 hover:text-blue-700 text-slate-700 font-bold text-sm rounded-lg transition border border-slate-300">
+                    低音區 (C1)
+                </button>
+                <button onclick="scrollToOctave(3)" class="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white font-bold text-sm rounded-lg transition shadow-sm">
+                    中音區 (C3-C5)
+                </button>
+                <button onclick="scrollToOctave(5)" class="px-3 py-1.5 bg-slate-100 hover:bg-blue-100 hover:text-blue-700 text-slate-700 font-bold text-sm rounded-lg transition border border-slate-300">
+                    高音區 (C5)
+                </button>
+            </div>
+        </header>
+
+        <!-- TOP TOOLBAR -->
+        <div class="bg-white p-4 md:p-5 rounded-2xl border border-slate-200 shadow-sm mb-6 flex flex-wrap items-center justify-between gap-4">
+            
+            <!-- Instrument Selector -->
+            <div class="flex items-center gap-3 min-w-[200px]">
+                <label class="font-bold text-slate-700 text-base flex items-center gap-1 shrink-0">
+                    🎵 樂器:
+                </label>
+                <select id="select-instrument" class="w-full bg-slate-100 border border-slate-300 font-bold text-slate-800 text-base rounded-xl px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer">
+                    <option value="piano">🎹 平台鋼琴 (Grand Piano)</option>
+                    <option value="epiano">⚡ 電子鋼琴 (Electric Piano)</option>
+                    <option value="guitar">🎸 木吉他 (Acoustic Guitar)</option>
+                    <option value="synth">🎛️ 合成器 (Synth Lead)</option>
+                    <option value="marimba">🔔 馬林巴木琴 (Marimba)</option>
+                </select>
+            </div>
+
+            <!-- Volume Control -->
+            <div class="flex items-center gap-3 min-w-[220px]">
+                <span id="vol-icon" class="text-xl">🔊</span>
+                <label class="font-bold text-slate-700 text-base shrink-0">音量:</label>
+                <input type="range" id="volume-slider" min="0" max="1" step="0.01" value="0.8" class="w-full h-2 bg-slate-200 rounded-lg accent-blue-600 cursor-pointer">
+                <span id="volume-val" class="font-mono font-bold text-slate-600 min-w-[40px] text-right">80%</span>
+            </div>
+
+            <!-- Labels Mode Toggle -->
+            <div class="flex items-center gap-2">
+                <button id="btn-labels" class="px-4 py-2 bg-slate-100 hover:bg-slate-200 active:bg-slate-300 text-slate-700 font-bold rounded-xl transition border border-slate-300 text-base flex items-center gap-2">
+                    🏷️ 標記: <span id="label-mode-text" class="text-blue-600 font-black">升/降音名</span>
+                </button>
+            </div>
+
+            <!-- Sustain Pedal Toggle -->
+            <div class="flex items-center gap-2">
+                <button id="btn-sustain" class="px-4 py-2 bg-slate-100 hover:bg-slate-200 active:bg-slate-300 text-slate-700 font-bold rounded-xl transition border border-slate-300 text-base flex items-center gap-2">
+                    🦶 延音腳踏板: <span id="sustain-status-text" class="text-slate-400 font-bold">關</span>
+                </button>
+            </div>
+
+            <!-- Record / Playback -->
+            <div class="flex items-center gap-2">
+                <button id="btn-record" class="px-4 py-2 bg-rose-50 hover:bg-rose-100 active:bg-rose-200 text-rose-700 border border-rose-300 font-bold rounded-xl transition text-base flex items-center gap-2">
+                    <span id="record-dot" class="w-3 h-3 rounded-full bg-rose-600 inline-block"></span>
+                    <span id="record-text">錄音</span>
+                </button>
+            </div>
+        </div>
+
+        <!-- PIANO KEYBOARD DISPLAY -->
+        <div class="piano-shell p-2 md:p-3 mb-8 relative">
+            <!-- Left / Right Scroll Overlay Arrows -->
+            <button onclick="scrollKeyboard(-300)" class="absolute left-4 top-1/2 -translate-y-1/2 z-30 bg-slate-900/80 hover:bg-blue-600 text-white w-10 h-10 rounded-full flex items-center justify-center font-bold text-xl shadow-lg border border-slate-600 opacity-80 hover:opacity-100 transition">
+                ❮
+            </button>
+            <button onclick="scrollKeyboard(300)" class="absolute right-4 top-1/2 -translate-y-1/2 z-30 bg-slate-900/80 hover:bg-blue-600 text-white w-10 h-10 rounded-full flex items-center justify-center font-bold text-xl shadow-lg border border-slate-600 opacity-80 hover:opacity-100 transition">
+                ❯
+            </button>
+
+            <!-- Scrollable Viewport -->
+            <div id="piano-viewport" class="piano-viewport">
+                <div id="piano-track" class="piano-track">
+                    <!-- 88 Keys generated via JS -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- LOWER SECTION: USER GUIDE & INSTRUCTIONS -->
+    <div class="mt-2 pt-6 border-t border-slate-300">
+        <h2 class="text-2xl font-black text-slate-800 mb-3 flex items-center gap-2">
+            📖 簡介與使用說明
+        </h2>
+        <p class="text-slate-600 text-base md:text-lg leading-relaxed mb-6 font-medium">
+            歡迎使用<strong>文文老師的線上鋼琴</strong>！本工具專為音樂學習與練習設計，具備完整的 88 鍵標準鋼琴音域 (A0 到 C8)。您可以透過滑鼠點擊、手機/平板觸控、或是電腦鍵盤來彈奏。
+        </p>
+
+        <!-- Keyboard Key Mapping Reference Table -->
+        <div class="bg-white rounded-2xl p-6 border border-slate-200 text-slate-700 shadow-sm">
+            <h3 class="font-bold text-lg mb-3 text-slate-800 flex items-center gap-2">
+                ⌨️ 中音區 (C3~C5) 電腦鍵盤按鍵對照：
+            </h3>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6 text-base font-medium">
+                <div class="bg-slate-50 p-4 rounded-xl border border-slate-200">
+                    <span class="font-bold text-slate-900 block mb-2">低音八度 (C3 - B3)：</span>
+                    <span class="text-blue-700">白鍵：</span> 
+                    <kbd class="px-2 py-1 bg-white border rounded shadow-sm font-mono text-sm font-bold">Z</kbd>
+                    <kbd class="px-2 py-1 bg-white border rounded shadow-sm font-mono text-sm font-bold">X</kbd>
+                    <kbd class="px-2 py-1 bg-white border rounded shadow-sm font-mono text-sm font-bold">C</kbd>
+                    <kbd class="px-2 py-1 bg-white border rounded shadow-sm font-mono text-sm font-bold">V</kbd>
+                    <kbd class="px-2 py-1 bg-white border rounded shadow-sm font-mono text-sm font-bold">B</kbd>
+                    <kbd class="px-2 py-1 bg-white border rounded shadow-sm font-mono text-sm font-bold">N</kbd>
+                    <kbd class="px-2 py-1 bg-white border rounded shadow-sm font-mono text-sm font-bold">M</kbd><br>
+                    <span class="text-indigo-700 mt-2 inline-block">黑鍵 (#/♭)：</span> 
+                    <kbd class="px-2 py-1 bg-slate-800 text-white border rounded shadow-sm font-mono text-sm font-bold">S</kbd>
+                    <kbd class="px-2 py-1 bg-slate-800 text-white border rounded shadow-sm font-mono text-sm font-bold">D</kbd>
+                    <kbd class="px-2 py-1 bg-slate-800 text-white border rounded shadow-sm font-mono text-sm font-bold">G</kbd>
+                    <kbd class="px-2 py-1 bg-slate-800 text-white border rounded shadow-sm font-mono text-sm font-bold">H</kbd>
+                    <kbd class="px-2 py-1 bg-slate-800 text-white border rounded shadow-sm font-mono text-sm font-bold">J</kbd>
+                </div>
+                <div class="bg-slate-50 p-4 rounded-xl border border-slate-200">
+                    <span class="font-bold text-slate-900 block mb-2">中音八度 (C4 - B4)：</span>
+                    <span class="text-blue-700">白鍵：</span> 
+                    <kbd class="px-2 py-1 bg-white border rounded shadow-sm font-mono text-sm font-bold">Q</kbd>
+                    <kbd class="px-2 py-1 bg-white border rounded shadow-sm font-mono text-sm font-bold">W</kbd>
+                    <kbd class="px-2 py-1 bg-white border rounded shadow-sm font-mono text-sm font-bold">E</kbd>
+                    <kbd class="px-2 py-1 bg-white border rounded shadow-sm font-mono text-sm font-bold">R</kbd>
+                    <kbd class="px-2 py-1 bg-white border rounded shadow-sm font-mono text-sm font-bold">T</kbd>
+                    <kbd class="px-2 py-1 bg-white border rounded shadow-sm font-mono text-sm font-bold">Y</kbd>
+                    <kbd class="px-2 py-1 bg-white border rounded shadow-sm font-mono text-sm font-bold">U</kbd><br>
+                    <span class="text-indigo-700 mt-2 inline-block">黑鍵 (#/♭)：</span> 
+                    <kbd class="px-2 py-1 bg-slate-800 text-white border rounded shadow-sm font-mono text-sm font-bold">2</kbd>
+                    <kbd class="px-2 py-1 bg-slate-800 text-white border rounded shadow-sm font-mono text-sm font-bold">3</kbd>
+                    <kbd class="px-2 py-1 bg-slate-800 text-white border rounded shadow-sm font-mono text-sm font-bold">5</kbd>
+                    <kbd class="px-2 py-1 bg-slate-800 text-white border rounded shadow-sm font-mono text-sm font-bold">6</kbd>
+                    <kbd class="px-2 py-1 bg-slate-800 text-white border rounded shadow-sm font-mono text-sm font-bold">7</kbd>
+                </div>
+            </div>
+            <p class="mt-4 text-sm text-slate-500 font-medium">
+                💡 提示：按住 <kbd class="px-2 py-0.5 bg-slate-100 border rounded font-mono">空白鍵 Space</kbd> 可以隨時啟動延音效果。
+            </p>
+        </div>
+    </div>
+
+    <!-- AUDIO ENGINE & LOGIC SCRIPT -->
+    <script>
+        // --- 1. FULL 88 KEYS DATA STRUCTURE ---
+        // MIDI Note 21 (A0) to MIDI Note 108 (C8)
+        const NOTE_NAMES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+        const SOLFEGE_NAMES = ['Do', '升Do', 'Re', '升Re', 'Mi', 'Fa', '升Fa', 'Sol', '升Sol', 'La', '升La', 'Si'];
+        
+        const CHINESE_BLACK_LABELS = {
+            'C#': '升C\n降D',
+            'D#': '升D\n降E',
+            'F#': '升F\n降G',
+            'G#': '升G\n降A',
+            'A#': '升A\n降B'
+        };
+
+        // Keyboard Shortcut Mapping for middle octaves (Index relative to MIDI 21)
+        // C3 is MIDI 48 (index 27), C4 is MIDI 60 (index 39)
+        const KEY_SHORTCUTS = {
+            'z': 27, 's': 28, 'x': 29, 'd': 30, 'c': 31, 'v': 32, 'g': 33, 'b': 34, 'h': 35, 'n': 36, 'j': 37, 'm': 38, // C3-B3
+            'q': 39, '2': 40, 'w': 41, '3': 42, 'e': 43, 'r': 44, '5': 45, 't': 46, '6': 47, 'y': 48, '7': 49, 'u': 50, // C4-B4
+            'i': 51, '9': 52, 'o': 53, '0': 54, 'p': 55, '[': 56, '=': 57, ']': 58  // C5-B5
+        };
+
+        // Build 88 Keys List
+        const pianoKeys = [];
+        for (let midi = 21; midi <= 108; midi++) {
+            const noteIndex = (midi - 12) % 12;
+            const noteName = NOTE_NAMES[noteIndex];
+            const octave = Math.floor((midi - 12) / 12);
+            const isBlack = noteName.includes('#');
+
+            // Find key map shortcut
+            let shortcut = '';
+            for (const [k, idx] of Object.entries(KEY_SHORTCUTS)) {
+                if (idx === (midi - 21)) shortcut = k.toUpperCase();
+            }
+
+            pianoKeys.push({
+                midi: midi,
+                keyIndex: midi - 21,
+                name: noteName,
+                octave: octave,
+                fullName: `${noteName}${octave}`,
+                isBlack: isBlack,
+                shortcut: shortcut
+            });
+        }
+
+        // --- 2. STATE VARIABLES ---
+        let audioCtx = null;
+        let masterGain = null;
+        let isSustainActive = false;
+        let labelMode = 'chinese'; // Modes: 'chinese', 'key', 'solfege', 'none'
+        let currentInstrument = 'piano';
+
+        // Recording
+        let isRecording = false;
+        let recordedEvents = [];
+        let recordStartTime = 0;
+
+        const activeVoices = new Map();
+        const sustainedVoices = new Set();
+
+        // --- 3. AUDIO ENGINE (WEB AUDIO API) ---
+        function initAudio() {
+            if (audioCtx) return;
+            const AudioContext = window.AudioContext || window.webkitAudioContext;
+            audioCtx = new AudioContext();
+
+            masterGain = audioCtx.createGain();
+            const volVal = parseFloat(document.getElementById('volume-slider').value);
+            masterGain.gain.value = volVal;
+            masterGain.connect(audioCtx.destination);
+        }
+
+        function getFrequency(midi) {
+            return 440 * Math.pow(2, (midi - 69) / 12);
+        }
+
+        function playNote(keyIndex) {
+            initAudio();
+            if (audioCtx.state === 'suspended') {
+                audioCtx.resume();
+            }
+
+            const keyData = pianoKeys[keyIndex];
+            if (!keyData) return;
+
+            if (activeVoices.has(keyIndex)) {
+                stopNote(keyIndex, true);
+            }
+
+            // Record Event
+            if (isRecording) {
+                recordedEvents.push({
+                    type: 'down',
+                    keyIndex: keyIndex,
+                    time: Date.now() - recordStartTime
+                });
+            }
+
+            const freq = getFrequency(keyData.midi);
+            const now = audioCtx.currentTime;
+
+            const voiceGain = audioCtx.createGain();
+            voiceGain.connect(masterGain);
+
+            let cleanup = () => {};
+
+            switch (currentInstrument) {
+                case 'piano': {
+                    const osc1 = audioCtx.createOscillator();
+                    const osc2 = audioCtx.createOscillator();
+                    const filter = audioCtx.createBiquadFilter();
+
+                    osc1.type = 'triangle';
+                    osc2.type = 'sine';
+                    osc1.frequency.setValueAtTime(freq, now);
+                    osc2.frequency.setValueAtTime(freq * 1.001, now);
+
+                    filter.type = 'lowpass';
+                    filter.frequency.setValueAtTime(freq * 4.0, now);
+                    filter.frequency.exponentialRampToValueAtTime(Math.max(freq * 1.1, 100), now + 1.2);
+
+                    voiceGain.gain.setValueAtTime(0.85, now);
+                    voiceGain.gain.exponentialRampToValueAtTime(0.001, now + 2.8);
+
+                    osc1.connect(filter);
+                    osc2.connect(filter);
+                    filter.connect(voiceGain);
+
+                    osc1.start(now);
+                    osc2.start(now);
+
+                    cleanup = (relTime) => {
+                        const rel = relTime || audioCtx.currentTime;
+                        voiceGain.gain.cancelScheduledValues(rel);
+                        voiceGain.gain.setValueAtTime(voiceGain.gain.value, rel);
+                        voiceGain.gain.exponentialRampToValueAtTime(0.0001, rel + 0.35);
+                        setTimeout(() => { try { osc1.stop(); osc2.stop(); } catch(e){} }, 400);
+                    };
+                    break;
+                }
+
+                case 'epiano': {
+                    const carrier = audioCtx.createOscillator();
+                    const modulator = audioCtx.createOscillator();
+                    const modGain = audioCtx.createGain();
+
+                    carrier.type = 'sine';
+                    modulator.type = 'sine';
+
+                    carrier.frequency.setValueAtTime(freq, now);
+                    modulator.frequency.setValueAtTime(freq * 12, now);
+
+                    modGain.gain.setValueAtTime(freq * 1.5, now);
+                    modGain.gain.exponentialRampToValueAtTime(1, now + 0.6);
+
+                    modulator.connect(modGain);
+                    modGain.connect(carrier.frequency);
+
+                    voiceGain.gain.setValueAtTime(0.7, now);
+                    voiceGain.gain.exponentialRampToValueAtTime(0.001, now + 2.2);
+
+                    carrier.connect(voiceGain);
+                    carrier.start(now);
+                    modulator.start(now);
+
+                    cleanup = (relTime) => {
+                        const rel = relTime || audioCtx.currentTime;
+                        voiceGain.gain.cancelScheduledValues(rel);
+                        voiceGain.gain.setValueAtTime(voiceGain.gain.value, rel);
+                        voiceGain.gain.exponentialRampToValueAtTime(0.0001, rel + 0.4);
+                        setTimeout(() => { try { carrier.stop(); modulator.stop(); } catch(e){} }, 450);
+                    };
+                    break;
+                }
+
+                case 'guitar': {
+                    const osc = audioCtx.createOscillator();
+                    const filter = audioCtx.createBiquadFilter();
+
+                    osc.type = 'sawtooth';
+                    osc.frequency.setValueAtTime(freq, now);
+
+                    filter.type = 'lowpass';
+                    filter.frequency.setValueAtTime(freq * 4.5, now);
+                    filter.frequency.exponentialRampToValueAtTime(150, now + 0.8);
+
+                    voiceGain.gain.setValueAtTime(0.85, now);
+                    voiceGain.gain.exponentialRampToValueAtTime(0.001, now + 1.5);
+
+                    osc.connect(filter);
+                    filter.connect(voiceGain);
+                    osc.start(now);
+
+                    cleanup = (relTime) => {
+                        const rel = relTime || audioCtx.currentTime;
+                        voiceGain.gain.cancelScheduledValues(rel);
+                        voiceGain.gain.setValueAtTime(voiceGain.gain.value, rel);
+                        voiceGain.gain.exponentialRampToValueAtTime(0.0001, rel + 0.15);
+                        setTimeout(() => { try { osc.stop(); } catch(e){} }, 200);
+                    };
+                    break;
+                }
+
+                case 'synth': {
+                    const osc1 = audioCtx.createOscillator();
+                    const osc2 = audioCtx.createOscillator();
+                    osc1.type = 'sawtooth';
+                    osc2.type = 'square';
+
+                    osc1.frequency.setValueAtTime(freq, now);
+                    osc2.frequency.setValueAtTime(freq * 1.003, now);
+
+                    voiceGain.gain.setValueAtTime(0.4, now);
+                    voiceGain.gain.linearRampToValueAtTime(0.3, now + 0.05);
+
+                    osc1.connect(voiceGain);
+                    osc2.connect(voiceGain);
+                    osc1.start(now);
+                    osc2.start(now);
+
+                    cleanup = (relTime) => {
+                        const rel = relTime || audioCtx.currentTime;
+                        voiceGain.gain.cancelScheduledValues(rel);
+                        voiceGain.gain.setValueAtTime(voiceGain.gain.value, rel);
+                        voiceGain.gain.linearRampToValueAtTime(0.0001, rel + 0.2);
+                        setTimeout(() => { try { osc1.stop(); osc2.stop(); } catch(e){} }, 250);
+                    };
+                    break;
+                }
+
+                case 'marimba': {
+                    const osc = audioCtx.createOscillator();
+                    osc.type = 'sine';
+                    osc.frequency.setValueAtTime(freq, now);
+
+                    voiceGain.gain.setValueAtTime(0.95, now);
+                    voiceGain.gain.exponentialRampToValueAtTime(0.0001, now + 1.2);
+
+                    osc.connect(voiceGain);
+                    osc.start(now);
+
+                    cleanup = (relTime) => {
+                        const rel = relTime || audioCtx.currentTime;
+                        voiceGain.gain.cancelScheduledValues(rel);
+                        voiceGain.gain.setValueAtTime(voiceGain.gain.value, rel);
+                        voiceGain.gain.exponentialRampToValueAtTime(0.0001, rel + 0.1);
+                        setTimeout(() => { try { osc.stop(); } catch(e){} }, 150);
+                    };
+                    break;
+                }
+            }
+
+            activeVoices.set(keyIndex, { stop: cleanup });
+            setKeyActiveUI(keyIndex, true);
+        }
+
+        function stopNote(keyIndex, immediate = false) {
+            if (isSustainActive && !immediate) {
+                sustainedVoices.add(keyIndex);
+                setKeyActiveUI(keyIndex, true);
+                return;
+            }
+
+            if (isRecording) {
+                recordedEvents.push({
+                    type: 'up',
+                    keyIndex: keyIndex,
+                    time: Date.now() - recordStartTime
+                });
+            }
+
+            const voice = activeVoices.get(keyIndex);
+            if (voice) {
+                voice.stop();
+                activeVoices.delete(keyIndex);
+            }
+            sustainedVoices.delete(keyIndex);
+            setKeyActiveUI(keyIndex, false);
+        }
+
+        // --- 4. RENDER 88 KEYS DOM ---
+        const pianoTrackEl = document.getElementById('piano-track');
+
+        function render88Keys() {
+            pianoTrackEl.innerHTML = '';
+            let whiteKeyCount = 0;
+
+            const isDesktop = window.innerWidth >= 768;
+            const whiteKeyWidth = isDesktop ? 54 : 46;
+            const blackKeyWidth = isDesktop ? 32 : 28;
+
+            pianoKeys.forEach((key) => {
+                if (!key.isBlack) {
+                    // WHITE KEY
+                    const keyDiv = document.createElement('div');
+                    keyDiv.className = 'white-key';
+                    keyDiv.dataset.keyIndex = key.keyIndex;
+                    if (key.name === 'C') keyDiv.id = `octave-anchor-${key.octave}`;
+
+                    let labelText = key.fullName;
+                    if (labelMode === 'solfege') {
+                        const sol = SOLFEGE_NAMES[(key.midi - 12) % 12];
+                        labelText = `${sol}${key.octave}`;
+                    } else if (labelMode === 'key') {
+                        labelText = key.shortcut || key.name;
+                    } else if (labelMode === 'none') {
+                        labelText = '';
+                    }
+
+                    keyDiv.innerHTML = `<span class="font-black text-xs md:text-sm text-slate-600 tracking-tight select-none pointer-events-none">${labelText}</span>`;
+
+                    bindKeyEvents(keyDiv, key.keyIndex);
+                    pianoTrackEl.appendChild(keyDiv);
+                    whiteKeyCount++;
+                } else {
+                    // BLACK KEY
+                    const keyDiv = document.createElement('div');
+                    keyDiv.className = 'black-key';
+                    keyDiv.dataset.keyIndex = key.keyIndex;
+
+                    // Calculate precise offset relative to previous white key
+                    const leftPos = (whiteKeyCount * whiteKeyWidth) - (blackKeyWidth / 2) + 12; // 12px is track left padding
+                    keyDiv.style.left = `${leftPos}px`;
+
+                    let labelText = CHINESE_BLACK_LABELS[key.name] || key.name;
+                    if (labelMode === 'key') labelText = key.shortcut;
+                    else if (labelMode === 'solfege') labelText = SOLFEGE_NAMES[(key.midi - 12) % 12];
+                    else if (labelMode === 'none') labelText = '';
+
+                    keyDiv.innerHTML = `<span class="font-bold text-[10px] md:text-xs text-center leading-tight tracking-tighter whitespace-pre-line pointer-events-none">${labelText}</span>`;
+
+                    bindKeyEvents(keyDiv, key.keyIndex);
+                    pianoTrackEl.appendChild(keyDiv);
+                }
+            });
+        }
+
+        let isPointerDown = false;
+
+        function bindKeyEvents(el, keyIndex) {
+            el.addEventListener('pointerdown', (e) => {
+                isPointerDown = true;
+                el.releasePointerCapture(e.pointerId);
+                playNote(keyIndex);
+            });
+
+            el.addEventListener('pointerenter', () => {
+                if (isPointerDown) playNote(keyIndex);
+            });
+
+            el.addEventListener('pointerleave', () => {
+                if (isPointerDown) stopNote(keyIndex);
+            });
+
+            el.addEventListener('pointerup', () => {
+                isPointerDown = false;
+                stopNote(keyIndex);
+            });
+        }
+
+        window.addEventListener('pointerup', () => {
+            isPointerDown = false;
+        });
+
+        function setKeyActiveUI(keyIndex, isActive) {
+            const keyEl = document.querySelector(`[data-key-index="${keyIndex}"]`);
+            if (keyEl) {
+                if (isActive) keyEl.classList.add('active');
+                else keyEl.classList.remove('active');
+            }
+        }
+
+        // --- 5. NAVIGATION & CONTROLS ---
+
+        function scrollKeyboard(amount) {
+            const viewport = document.getElementById('piano-viewport');
+            viewport.scrollBy({ left: amount, behavior: 'smooth' });
+        }
+
+        function scrollToOctave(octaveNum) {
+            const target = document.getElementById(`octave-anchor-${octaveNum}`);
+            if (target) {
+                target.scrollIntoView({ behavior: 'smooth', inline: 'start', block: 'nearest' });
+            }
+        }
+
+        // Instrument Selector
+        document.getElementById('select-instrument').addEventListener('change', (e) => {
+            currentInstrument = e.target.value;
+        });
+
+        // Master Volume Slider
+        const volumeSlider = document.getElementById('volume-slider');
+        const volumeVal = document.getElementById('volume-val');
+        const volIcon = document.getElementById('vol-icon');
+
+        volumeSlider.addEventListener('input', (e) => {
+            const val = parseFloat(e.target.value);
+            if (masterGain) masterGain.gain.value = val;
+            const pct = Math.round(val * 100);
+            volumeVal.innerText = `${pct}%`;
+
+            if (pct === 0) volIcon.innerText = '🔇';
+            else if (pct < 40) volIcon.innerText = '🔉';
+            else volIcon.innerText = '🔊';
+        });
+
+        // Label Mode Toggle
+        const labelBtn = document.getElementById('btn-labels');
+        const labelTextMap = {
+            'chinese': '升/降音名',
+            'key': '電腦按鍵',
+            'solfege': '唱名 (DoReMi)',
+            'none': '隱藏標記'
+        };
+
+        labelBtn.addEventListener('click', () => {
+            if (labelMode === 'chinese') labelMode = 'key';
+            else if (labelMode === 'key') labelMode = 'solfege';
+            else if (labelMode === 'solfege') labelMode = 'none';
+            else labelMode = 'chinese';
+
+            document.getElementById('label-mode-text').innerText = labelTextMap[labelMode];
+            render88Keys();
+        });
+
+        // Sustain Pedal
+        const sustainBtn = document.getElementById('btn-sustain');
+        function setSustain(active) {
+            isSustainActive = active;
+            document.getElementById('sustain-status-text').innerText = active ? "開" : "關";
+            document.getElementById('sustain-status-text').className = active ? "text-amber-500 font-bold" : "text-slate-400 font-bold";
+
+            if (!active) {
+                sustainedVoices.forEach(keyIndex => stopNote(keyIndex, true));
+                sustainedVoices.clear();
+            }
+        }
+        sustainBtn.addEventListener('click', () => setSustain(!isSustainActive));
+
+        // Recording & Playback
+        const recordBtn = document.getElementById('btn-record');
+        recordBtn.addEventListener('click', () => {
+            if (!isRecording) {
+                isRecording = true;
+                recordedEvents = [];
+                recordStartTime = Date.now();
+                document.getElementById('record-text').innerText = "停止 / 播放";
+                document.getElementById('record-dot').className = "w-3 h-3 rounded-full bg-rose-600 animate-ping inline-block";
+            } else {
+                isRecording = false;
+                document.getElementById('record-text').innerText = "錄音";
+                document.getElementById('record-dot').className = "w-3 h-3 rounded-full bg-rose-500 inline-block";
+                playRecordedTrack();
+            }
+        });
+
+        function playRecordedTrack() {
+            if (recordedEvents.length === 0) return;
+
+            recordedEvents.forEach(event => {
+                setTimeout(() => {
+                    if (event.type === 'down') playNote(event.keyIndex);
+                    else stopNote(event.keyIndex, true);
+                }, event.time);
+            });
+        }
+
+        // --- 6. PC KEYBOARD BINDINGS ---
+        window.addEventListener('keydown', (e) => {
+            if (e.repeat) return;
+
+            if (e.code === 'Space') {
+                e.preventDefault();
+                setSustain(true);
+                return;
+            }
+
+            const key = e.key.toLowerCase();
+            if (KEY_SHORTCUTS.hasOwnProperty(key)) {
+                playNote(KEY_SHORTCUTS[key]);
+            }
+        });
+
+        window.addEventListener('keyup', (e) => {
+            if (e.code === 'Space') {
+                e.preventDefault();
+                setSustain(false);
+                return;
+            }
+
+            const key = e.key.toLowerCase();
+            if (KEY_SHORTCUTS.hasOwnProperty(key)) {
+                stopNote(KEY_SHORTCUTS[key]);
+            }
+        });
+
+        // Initialize App & Auto Scroll to Middle Octave (C3-C5)
+        window.addEventListener('load', () => {
+            render88Keys();
+            setTimeout(() => scrollToOctave(3), 200);
+        });
+
+        window.addEventListener('resize', render88Keys);
+    </script>
+</body>
+</html>
